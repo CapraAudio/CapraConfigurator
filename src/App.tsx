@@ -372,12 +372,45 @@ export default function App() {
       window.setTimeout(() => setCopied(false), 1800)
     } catch { window.prompt('Copy your colorway link', url.toString()) }
   }
-  function download() {
+  async function download() {
     const canvas = canvasRef.current
     if (!canvas) return
+    const exportCanvas = document.createElement('canvas')
+    exportCanvas.width = canvas.width
+    exportCanvas.height = canvas.height
+    const context = exportCanvas.getContext('2d')
+    if (!context) return
+    context.drawImage(canvas, 0, 0)
+
+    try {
+      const watermark = await loadImage('./capra-watermark.svg')
+      const watermarkWidth = Math.round(exportCanvas.width * 0.12)
+      const aspectRatio = watermark.naturalWidth / watermark.naturalHeight || 494 / 412
+      const watermarkHeight = Math.round(watermarkWidth / aspectRatio)
+      const inset = Math.round(exportCanvas.width * 0.025)
+      const tintedWatermark = document.createElement('canvas')
+      tintedWatermark.width = watermarkWidth
+      tintedWatermark.height = watermarkHeight
+      const watermarkContext = tintedWatermark.getContext('2d')
+      if (watermarkContext) {
+        watermarkContext.drawImage(watermark, 0, 0, watermarkWidth, watermarkHeight)
+        watermarkContext.globalCompositeOperation = 'source-in'
+        watermarkContext.fillStyle = theme === 'dark' ? '#FFFFFF' : '#171719'
+        watermarkContext.fillRect(0, 0, watermarkWidth, watermarkHeight)
+        context.save()
+        context.globalAlpha = 0.62
+        context.drawImage(
+          tintedWatermark,
+          exportCanvas.width - watermarkWidth - inset,
+          exportCanvas.height - watermarkHeight - inset,
+        )
+        context.restore()
+      }
+    } catch { /* Export the model without a watermark if the logo asset cannot load. */ }
+
     const link = document.createElement('a')
     link.download = `${model.id}-colorway.png`
-    link.href = canvas.toDataURL('image/png')
+    link.href = exportCanvas.toDataURL('image/png')
     link.click()
   }
 
