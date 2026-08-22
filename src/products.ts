@@ -50,6 +50,8 @@ export const COLORS: ColorOption[] = [
   { id: 'violet', name: 'Violet', hex: '#8E24AA' },
 ]
 
+const publicAsset = (fileName: string) => `./${fileName}`
+
 const satyr4Parts: ProductPart[] = [
   { id: 'S000', solidId: 'S000', name: 'Headband', category: 'headband' },
   { id: 'S001', solidId: 'S001', name: 'Right Pivot Block', category: 'headband' },
@@ -103,9 +105,9 @@ const satyr4Defaults: Record<string, string> = {
 export const SATYR_4: ProductModelDefinition = {
   id: 'satyr-4',
   name: 'Satyr 4',
-  assetUrl: '/satyr-4-grouped.glb',
-  previewUrl: '/satyr-4-preview.png',
-  maskUrl: (solidId) => `/mask-${solidId.toLowerCase()}.png`,
+  assetUrl: publicAsset('satyr-4-grouped.glb'),
+  previewUrl: publicAsset('satyr-4-preview.png'),
+  maskUrl: (solidId) => publicAsset(`mask-${solidId.toLowerCase()}.png`),
   initialRotation: [0.04, -0.18, 0],
   parts: satyr4Parts,
   defaultColors: satyr4Defaults,
