@@ -34,9 +34,9 @@ export type ProductConfigV2 = {
 }
 
 export const PART_CATEGORIES: Array<{ id: PartCategory; name: string }> = [
+  { id: 'left-cup', name: 'Left Cup' },
   { id: 'headband', name: 'Headband' },
   { id: 'right-cup', name: 'Right Cup' },
-  { id: 'left-cup', name: 'Left Cup' },
 ]
 
 export const COLORS: ColorOption[] = [
