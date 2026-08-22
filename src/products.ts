@@ -108,7 +108,7 @@ export const SATYR_4: ProductModelDefinition = {
   assetUrl: publicAsset('satyr-4-grouped.glb'),
   previewUrl: publicAsset('satyr-4-preview.png'),
   maskUrl: (solidId) => publicAsset(`mask-${solidId.toLowerCase()}.png`),
-  initialRotation: [0.04, -0.18, 0],
+  initialRotation: [0.14, -0.61, 0],
   parts: satyr4Parts,
   defaultColors: satyr4Defaults,
   fixedColors: {
