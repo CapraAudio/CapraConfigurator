@@ -7,6 +7,11 @@ import {
   PRODUCT_MODEL_BY_ID, PRODUCT_MODELS, SATYR_4, normalizeHex,
   type PartCategory, type ProductConfigV2, type ProductModelDefinition,
 } from './products'
+import {
+  FILAMENT_MATERIALS, amazonAffiliateUrl, buildFilamentCombinations,
+  filamentColorsBrowseUrl, filamentColorsSwatchUrl, findFilamentRecommendations,
+  type FilamentRecommendation,
+} from './filaments'
 
 type Theme = 'light' | 'dark'
 type Colorway = Record<string, string>
@@ -314,6 +319,121 @@ function ThreePreview({ definition, colorway, canvasRef, theme }: {
   </div>
 }
 
+function FilamentFinderDialog({ open, definition, colorway, onClose }: {
+  open: boolean
+  definition: ProductModelDefinition
+  colorway: Colorway
+  onClose: () => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const [recommendations, setRecommendations] = useState<FilamentRecommendation[]>([])
+  const [loading, setLoading] = useState(false)
+  const [requestId, setRequestId] = useState(0)
+  const combinations = useMemo(() => buildFilamentCombinations(definition, colorway), [colorway, definition])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (open && !dialog.open) dialog.showModal()
+    if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    let current = true
+    setLoading(true)
+    setRecommendations([])
+    findFilamentRecommendations(combinations).then((results) => {
+      if (current) setRecommendations(results)
+    }).finally(() => {
+      if (current) setLoading(false)
+    })
+    return () => { current = false }
+  }, [combinations, open, requestId])
+
+  const grouped = useMemo(() => {
+    const groups = new Map<string, FilamentRecommendation[]>()
+    for (const recommendation of recommendations) {
+      const group = groups.get(recommendation.color)
+      if (group) group.push(recommendation)
+      else groups.set(recommendation.color, [recommendation])
+    }
+    return [...groups.entries()]
+  }, [recommendations])
+  const failedCount = recommendations.filter((item) => item.status === 'error').length
+
+  return <dialog
+    ref={dialogRef}
+    className="filament-dialog"
+    aria-labelledby="filament-dialog-title"
+    aria-describedby="filament-dialog-intro"
+    onClose={onClose}
+    onKeyDown={(event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        dialogRef.current?.close()
+      }
+    }}
+    onClick={(event) => { if (event.target === dialogRef.current) dialogRef.current.close() }}
+  >
+    <div className="filament-dialog-panel">
+      <header className="filament-dialog-header">
+        <div>
+          <p className="eyebrow">MATERIAL MATCHING</p>
+          <h2 id="filament-dialog-title">Find Filaments</h2>
+          <p id="filament-dialog-intro">Closest measured colors for every material approved for this colorway.</p>
+        </div>
+        <button className="dialog-close" type="button" autoFocus aria-label="Close filament finder" onClick={() => dialogRef.current?.close()}>×</button>
+      </header>
+
+      {loading && <div className="filament-loading" role="status">
+        <span className="loading-dot" aria-hidden="true" /> Matching colors with FilamentColors.xyz…
+      </div>}
+
+      {!loading && combinations.length === 0 && <div className="filament-empty">
+        <h3>No configurable colors found.</h3><p>Close this window and select a model color before trying again.</p>
+      </div>}
+
+      {!loading && failedCount > 0 && <div className="filament-notice" role="status">
+        <span>{failedCount === recommendations.length ? 'Filament matching is currently unavailable.' : `${failedCount} material ${failedCount === 1 ? 'match' : 'matches'} could not be loaded.`}</span>
+        <button type="button" onClick={() => setRequestId((value) => value + 1)}>Retry</button>
+      </div>}
+
+      {!loading && <div className="filament-groups">
+        {grouped.map(([color, items]) => <section className="filament-color-group" key={color}>
+          <h3><i style={{ background: color }} aria-hidden="true" /><span>{color}</span><small>{items.length} approved {items.length === 1 ? 'material' : 'materials'}</small></h3>
+          <div className="filament-table-wrap">
+            <table>
+              <thead><tr><th>Material</th><th>Closest filament</th><th>Color</th><th>Used on</th><th>Links</th></tr></thead>
+              <tbody>{items.map((item) => {
+                const material = FILAMENT_MATERIALS[item.material]
+                return <tr key={`${item.color}:${item.material}`} className={item.status === 'error' ? 'match-error' : ''}>
+                  <td data-label="Material"><strong>{material.label}</strong></td>
+                  <td data-label="Closest filament">{item.swatch
+                    ? <><strong>{item.swatch.manufacturer} · {item.swatch.colorName}</strong><small>{item.swatch.filamentType}</small></>
+                    : <><strong>Match unavailable</strong><small>{item.error}</small></>}</td>
+                  <td data-label="Color"><div className="color-comparison"><span style={{ background: item.color }} /><code>{item.color}</code>{item.swatch && <><b>→</b><span style={{ background: item.swatch.hex }} /><code>{item.swatch.hex}</code></>}</div></td>
+                  <td data-label="Used on"><span className="part-list">{item.parts.map((part) => part.name).join(', ')}</span></td>
+                  <td data-label="Links"><div className="filament-links">{item.swatch ? <>
+                    <a href={filamentColorsSwatchUrl(item.swatch)} target="_blank" rel="noopener noreferrer">View swatch</a>
+                    {item.swatch.manufacturerPurchaseUrl && <a href={item.swatch.manufacturerPurchaseUrl} target="_blank" rel="noopener noreferrer sponsored">Manufacturer</a>}
+                    <a className="amazon-link" href={amazonAffiliateUrl(item.swatch)} target="_blank" rel="noopener noreferrer sponsored">Search Amazon <small>(paid link)</small></a>
+                  </> : <a href={filamentColorsBrowseUrl(item.material)} target="_blank" rel="noopener noreferrer">Browse {material.label}</a>}</div></td>
+                </tr>
+              })}</tbody>
+            </table>
+          </div>
+        </section>)}
+      </div>}
+
+      <footer className="filament-dialog-footer">
+        <p>Measured color data provided by <a href="https://filamentcolors.xyz/" target="_blank" rel="noopener noreferrer">FilamentColors.xyz</a>. Computer previews and physical filament may differ.</p>
+        <p className="affiliate-disclosure">As an Amazon Associate I earn from qualifying purchases.</p>
+      </footer>
+    </div>
+  </dialog>
+}
+
 export default function App() {
   const [initialConfig] = useState(readInitialConfig)
   const [modelId, setModelId] = useState(initialConfig.modelId)
@@ -324,6 +444,8 @@ export default function App() {
   const [selectedPart, setSelectedPart] = useState(model.parts[0].id)
   const [hexDraft, setHexDraft] = useState(colorway[model.parts[0].id])
   const [copied, setCopied] = useState(false)
+  const [filamentFinderOpen, setFilamentFinderOpen] = useState(false)
+  const filamentButtonRef = useRef<HTMLButtonElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const visibleParts = useMemo(() => model.parts.filter((part) => part.category === category), [category, model])
   const currentPart = model.parts.find((part) => part.id === selectedPart) ?? visibleParts[0] ?? model.parts[0]
@@ -465,9 +587,16 @@ export default function App() {
           </div>
           <p id="hex-help" className={invalidHex ? 'hex-help error' : 'hex-help'} aria-live="polite">{invalidHex ? 'Enter a 3- or 6-digit hex color.' : 'Use RGB or RRGGBB, with or without #.'}</p>
         </div>
+        <button ref={filamentButtonRef} className="filament-button" onClick={() => setFilamentFinderOpen(true)}>Find Filaments</button>
         <button className="share-button" onClick={share}>{copied ? 'Link copied ✓' : 'Share this colorway'}</button>
       </aside>
     </section>
-    <footer><span>Capra Configurator</span><span>Rendered from the production CAD assembly</span></footer>
+    <footer><span>Capra Configurator</span><span>Rendered from the production CAD assembly</span><span>As an Amazon Associate I earn from qualifying purchases.</span></footer>
+    <FilamentFinderDialog
+      open={filamentFinderOpen}
+      definition={model}
+      colorway={colorway}
+      onClose={() => { setFilamentFinderOpen(false); window.setTimeout(() => filamentButtonRef.current?.focus(), 0) }}
+    />
   </main>
 }
