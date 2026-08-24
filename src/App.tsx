@@ -607,12 +607,12 @@ export default function App() {
         </div>
         <div className="part-grid" id="category-parts" role="tabpanel" aria-labelledby={`category-${category}`}>
           {visibleParts.map((part) => <button key={part.id} type="button" aria-pressed={selectedPart === part.id} className={selectedPart === part.id ? 'active' : ''} onClick={() => setSelectedPart(part.id)}>
-            <i style={{ background: colorway[part.id] }} /><span>{part.name}</span><small>{part.solidId}</small>
+            <i style={{ background: colorway[part.id] }} /><span>{part.name}</span>{(part.displayCode || !part.hideSolidId) && <small>{part.displayCode ?? part.solidId}</small>}
           </button>)}
         </div>
 
         <div className="color-section">
-          <div className="color-heading"><div><span>{currentPart.name}</span><small>{currentPart.solidId}</small></div><code>{currentColor}</code></div>
+          <div className="color-heading"><div><span>{currentPart.name}</span>{(currentPart.displayCode || !currentPart.hideSolidId) && <small>{currentPart.displayCode ? `${currentPart.displayCode}${currentPart.hideSolidId ? '' : ` · ${currentPart.solidId}`}` : currentPart.solidId}</small>}</div><code>{currentColor}</code></div>
           <div className="palette">
             {COLORS.map((color) => {
               const selected = currentColor.toUpperCase() === color.hex

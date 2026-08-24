@@ -6,6 +6,8 @@ export type ProductPart = {
   id: string
   solidId: string
   name: string
+  displayCode?: string
+  hideSolidId?: boolean
   category: PartCategory
   allowedFilamentMaterials: FilamentMaterialId[]
 }
@@ -68,28 +70,28 @@ const CUP_PART: FilamentMaterialId[] = ['petg', 'pctg', 'abs', 'asa', 'pla']
 const FLEXIBLE_CUP_PART: FilamentMaterialId[] = [...CUP_PART, 'tpu-95a']
 
 const satyr4Parts: ProductPart[] = [
-  { id: 'S000', solidId: 'S000', name: 'Headband', category: 'headband', allowedFilamentMaterials: TPU_95A },
-  { id: 'S001', solidId: 'S001', name: 'Right Pivot Block', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
-  { id: 'S002', solidId: 'S002', name: 'Right Adjustment Arm', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
-  { id: 'S003', solidId: 'S003', name: 'Left Pivot Block', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
-  { id: 'S004', solidId: 'S004', name: 'Left Adjustment Arm', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
-  { id: 'S005', solidId: 'S005', name: 'Comfort Strap', category: 'headband', allowedFilamentMaterials: TPU_95A },
-  { id: 'S006', solidId: 'S006', name: 'Right Housing', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S013', solidId: 'S013', name: 'Right Driver Retainer', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S014', solidId: 'S014', name: 'Right Baffle', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S015', solidId: 'S015', name: 'Right Pad Ring', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S016', solidId: 'S016', name: 'Right Yoke', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S017', solidId: 'S017', name: 'Right Inner Grille + Trim', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S018', solidId: 'S018', name: 'Right Outer Grille', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S021', solidId: 'S021', name: 'Right Spacer', category: 'right-cup', allowedFilamentMaterials: FLEXIBLE_CUP_PART },
-  { id: 'S046', solidId: 'S046', name: 'Left Housing', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S054', solidId: 'S054', name: 'Left Driver Retainer', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S055', solidId: 'S055', name: 'Left Baffle', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S056', solidId: 'S056', name: 'Left Pad Ring', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S059', solidId: 'S059', name: 'Left Yoke', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S060', solidId: 'S060', name: 'Left Inner Grille + Trim', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S061', solidId: 'S061', name: 'Left Outer Grille', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S063', solidId: 'S063', name: 'Left Spacer', category: 'left-cup', allowedFilamentMaterials: FLEXIBLE_CUP_PART },
+  { id: 'S000', solidId: 'S000', name: 'Headband', displayCode: 'H3-01', category: 'headband', allowedFilamentMaterials: TPU_95A },
+  { id: 'S001', solidId: 'S001', name: 'Right Pivot Block', displayCode: 'H3-03.5', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
+  { id: 'S002', solidId: 'S002', name: 'Right Adjustment Arm', displayCode: 'H3-03', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
+  { id: 'S003', solidId: 'S003', name: 'Left Pivot Block', displayCode: 'H3-03.5', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
+  { id: 'S004', solidId: 'S004', name: 'Left Adjustment Arm', displayCode: 'H3-03', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
+  { id: 'S005', solidId: 'S005', name: 'Comfort Strap', displayCode: 'H3-02', category: 'headband', allowedFilamentMaterials: TPU_95A },
+  { id: 'S006', solidId: 'S006', name: 'Right Housing', displayCode: 'S4-07', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S013', solidId: 'S013', name: 'Right Driver Plate', displayCode: 'S4-05', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S014', solidId: 'S014', name: 'Right Baffle', displayCode: 'S4-04', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S015', solidId: 'S015', name: 'Right Baffle Rim', displayCode: 'S4-03', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S016', solidId: 'S016', name: 'Right Yoke', displayCode: 'S4-01', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S017', solidId: 'S017', name: 'Right Inner Grille - Trim', displayCode: 'S4-10+S4-09', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S018', solidId: 'S018', name: 'Right Outer Grille', displayCode: 'S4-11', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S021', solidId: 'S021', name: 'Right Spacer', displayCode: 'S4-06', category: 'right-cup', allowedFilamentMaterials: FLEXIBLE_CUP_PART },
+  { id: 'S046', solidId: 'S046', name: 'Left Housing', displayCode: 'S4-08', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S054', solidId: 'S054', name: 'Left Driver Plate', displayCode: 'S4-05', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S055', solidId: 'S055', name: 'Left Baffle', displayCode: 'S4-04', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S056', solidId: 'S056', name: 'Left Baffle Rim', displayCode: 'S4-03', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S059', solidId: 'S059', name: 'Left Yoke', displayCode: 'S4-02', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S060', solidId: 'S060', name: 'Left Inner Grille + Trim', displayCode: 'S4-10+S4-09', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S061', solidId: 'S061', name: 'Left Outer Grille', displayCode: 'S4-11', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S063', solidId: 'S063', name: 'Left Spacer', displayCode: 'S4-06', category: 'left-cup', allowedFilamentMaterials: FLEXIBLE_CUP_PART },
 ]
 
 const satyr4Defaults: Record<string, string> = {
@@ -144,18 +146,18 @@ export const SATYR_4: ProductModelDefinition = {
 }
 
 const openOmegaParts: ProductPart[] = [
-  { id: 'S000', solidId: 'S000', name: 'Headband', category: 'headband', allowedFilamentMaterials: TPU_95A },
-  { id: 'S001', solidId: 'S001', name: 'Right Pivot Block', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
-  { id: 'S002', solidId: 'S002', name: 'Right Adjustment Arm', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
-  { id: 'S003', solidId: 'S003', name: 'Left Pivot Block', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
-  { id: 'S004', solidId: 'S004', name: 'Left Adjustment Arm', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
-  { id: 'S005', solidId: 'S005', name: 'Comfort Strap', category: 'headband', allowedFilamentMaterials: TPU_95A },
-  { id: 'S006', solidId: 'S006', name: 'Right Yoke', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S008', solidId: 'S008', name: 'Right Cup', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S011', solidId: 'S011', name: 'Right Driver Cap', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S019', solidId: 'S019', name: 'Left Yoke', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S021', solidId: 'S021', name: 'Left Cup', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
-  { id: 'S031', solidId: 'S031', name: 'Left Driver Cap', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S000', solidId: 'S000', name: 'Headband', displayCode: 'H3-01', category: 'headband', allowedFilamentMaterials: TPU_95A },
+  { id: 'S001', solidId: 'S001', name: 'Right Pivot Block', displayCode: 'H3-03.5', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
+  { id: 'S002', solidId: 'S002', name: 'Right Adjustment Arm', displayCode: 'H3-03', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
+  { id: 'S003', solidId: 'S003', name: 'Left Pivot Block', displayCode: 'H3-03.5', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
+  { id: 'S004', solidId: 'S004', name: 'Left Adjustment Arm', displayCode: 'H3-03', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
+  { id: 'S005', solidId: 'S005', name: 'Comfort Strap', displayCode: 'H3-02', category: 'headband', allowedFilamentMaterials: TPU_95A },
+  { id: 'S006', solidId: 'S006', name: 'Right Yoke', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S008', solidId: 'S008', name: 'Right Cup', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S011', solidId: 'S011', name: 'Right Driver Cap', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S019', solidId: 'S019', name: 'Left Yoke', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S021', solidId: 'S021', name: 'Left Cup', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S031', solidId: 'S031', name: 'Left Driver Cap', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: CUP_PART },
 ]
 
 const openOmegaDefaults: Record<string, string> = {

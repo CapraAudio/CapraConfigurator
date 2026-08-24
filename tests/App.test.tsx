@@ -10,7 +10,7 @@ vi.mock('../src/filaments', async (importOriginal) => {
 
 import App from '../src/App'
 import { findFilamentRecommendations } from '../src/filaments'
-import { OPEN_OMEGA, PRODUCT_MODEL_BY_ID } from '../src/products'
+import { OPEN_OMEGA, PRODUCT_MODEL_BY_ID, SATYR_4 } from '../src/products'
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', '') }
@@ -75,6 +75,10 @@ describe('Open-Omega model', () => {
       expect(OPEN_OMEGA.defaultColors[part.id]).toMatch(/^#[0-9A-F]{6}$/)
       expect(part.allowedFilamentMaterials.length).toBeGreaterThan(0)
     }
+    expect(OPEN_OMEGA.parts.filter((part) => part.category === 'headband').map((part) => part.displayCode)).toEqual([
+      'H3-01', 'H3-03.5', 'H3-03', 'H3-03.5', 'H3-03', 'H3-02',
+    ])
+    expect(OPEN_OMEGA.parts.filter((part) => part.category !== 'headband').every((part) => part.hideSolidId)).toBe(true)
   })
 
   it('labels Open-Omega as a DMS design and not a Capra headphone', () => {
@@ -117,5 +121,32 @@ describe('Open-Omega model', () => {
     window.history.replaceState({}, '', '/?model=open-omega')
     render(<App />)
     expect(screen.getByRole('link', { name: /Get print files DMS GitHub/i })).toHaveAttribute('href', 'https://github.com/DMS3tv/Open-Omega')
+  })
+
+  it('shows headband guide codes but hides internal cup solid IDs', () => {
+    window.history.replaceState({}, '', '/?model=open-omega')
+    render(<App />)
+    expect(screen.getByRole('button', { name: /Headband H3-01/ })).toBeVisible()
+    fireEvent.click(screen.getByRole('tab', { name: 'Right Cup' }))
+    expect(screen.getByRole('button', { name: 'Right Yoke' })).toBeVisible()
+    expect(screen.queryByText('S006')).not.toBeInTheDocument()
+  })
+})
+
+describe('Satyr 4 guide labels', () => {
+  it('uses the guide names and display codes while retaining CAD solid IDs', () => {
+    expect(Object.fromEntries(SATYR_4.parts.map((part) => [part.solidId, [part.name, part.displayCode]]))).toMatchObject({
+      S000: ['Headband', 'H3-01'], S001: ['Right Pivot Block', 'H3-03.5'],
+      S002: ['Right Adjustment Arm', 'H3-03'], S003: ['Left Pivot Block', 'H3-03.5'],
+      S004: ['Left Adjustment Arm', 'H3-03'], S005: ['Comfort Strap', 'H3-02'],
+      S006: ['Right Housing', 'S4-07'], S013: ['Right Driver Plate', 'S4-05'],
+      S014: ['Right Baffle', 'S4-04'], S015: ['Right Baffle Rim', 'S4-03'],
+      S016: ['Right Yoke', 'S4-01'], S017: ['Right Inner Grille - Trim', 'S4-10+S4-09'],
+      S018: ['Right Outer Grille', 'S4-11'], S021: ['Right Spacer', 'S4-06'],
+      S046: ['Left Housing', 'S4-08'], S054: ['Left Driver Plate', 'S4-05'],
+      S055: ['Left Baffle', 'S4-04'], S056: ['Left Baffle Rim', 'S4-03'],
+      S059: ['Left Yoke', 'S4-02'], S060: ['Left Inner Grille + Trim', 'S4-10+S4-09'],
+      S061: ['Left Outer Grille', 'S4-11'], S063: ['Left Spacer', 'S4-06'],
+    })
   })
 })
