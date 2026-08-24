@@ -159,7 +159,11 @@ function applyThreeColors(model: THREE.Object3D, definition: ProductModelDefinit
 
 function createCadMaterial(color: string, metallic: boolean) {
   return new THREE.ShaderMaterial({
-    uniforms: { baseColor: { value: new THREE.Color(color) }, metallic: { value: metallic ? 1 : 0 } },
+    uniforms: {
+      baseColor: { value: new THREE.Color(color) },
+      metallic: { value: metallic ? 1 : 0 },
+      selectionGlow: { value: 0 },
+    },
     vertexShader: `
       varying vec3 vViewPosition;
       void main() {
@@ -171,6 +175,7 @@ function createCadMaterial(color: string, metallic: boolean) {
     fragmentShader: `
       uniform vec3 baseColor;
       uniform float metallic;
+      uniform float selectionGlow;
       varying vec3 vViewPosition;
       void main() {
         vec3 dx = dFdx(vViewPosition);
@@ -181,13 +186,52 @@ function createCadMaterial(color: string, metallic: boolean) {
         vec3 viewDirection = normalize(-vViewPosition);
         float rim = pow(1.0 - abs(dot(normal, viewDirection)), 2.2) * 0.16;
         float highlight = pow(abs(dot(reflect(-lightDirection, normal), viewDirection)), 18.0) * (0.08 + metallic * 0.22);
-        vec3 shaded = baseColor * diffuse + baseColor * rim + vec3(highlight);
+        vec3 glowColor = mix(baseColor, vec3(1.0), 0.42);
+        vec3 selectionLight = glowColor * selectionGlow * (0.28 + rim * 1.2);
+        vec3 shaded = baseColor * diffuse + baseColor * rim + vec3(highlight) + selectionLight;
         gl_FragColor = vec4(shaded, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
     `,
     side: THREE.DoubleSide,
+  })
+}
+
+function createSelectionOverlayMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      glowColor: { value: new THREE.Color('#FFF1D8') },
+      glowStrength: { value: 0 },
+    },
+    vertexShader: `
+      varying vec3 vViewPosition;
+      void main() {
+        vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = viewPosition.xyz;
+        gl_Position = projectionMatrix * viewPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 glowColor;
+      uniform float glowStrength;
+      varying vec3 vViewPosition;
+      void main() {
+        vec3 dx = dFdx(vViewPosition);
+        vec3 dy = dFdy(vViewPosition);
+        vec3 normal = normalize(cross(dx, dy));
+        vec3 viewDirection = normalize(-vViewPosition);
+        float rim = pow(1.0 - abs(dot(normal, viewDirection)), 1.65);
+        float alpha = glowStrength * (0.055 + rim * 0.32);
+        gl_FragColor = vec4(glowColor * (0.38 + rim * 1.1), alpha);
+      }
+    `,
+    side: THREE.DoubleSide,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
   })
 }
 
@@ -200,16 +244,36 @@ function disposeObject(object: THREE.Object3D) {
   })
 }
 
-function ThreePreview({ definition, colorway, canvasRef, theme }: {
-  definition: ProductModelDefinition; colorway: Colorway; canvasRef: React.RefObject<HTMLCanvasElement>; theme: Theme
+function doublePulse(elapsedMilliseconds: number) {
+  const elapsed = elapsedMilliseconds / 1000
+  if (elapsed >= 0 && elapsed <= 0.44) return Math.sin(Math.PI * elapsed / 0.44)
+  if (elapsed >= 0.54 && elapsed <= 0.98) return Math.sin(Math.PI * (elapsed - 0.54) / 0.44)
+  return 0
+}
+
+function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId, selectionPulseKey }: {
+  definition: ProductModelDefinition
+  colorway: Colorway
+  canvasRef: React.RefObject<HTMLCanvasElement>
+  theme: Theme
+  selectedSolidId: string
+  selectionPulseKey: number
 }) {
   const [mode, setMode] = useState<'loading' | 'three' | 'fallback'>('loading')
   const modelRef = useRef<THREE.Object3D | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const latestTheme = useRef(theme)
   const latestColorway = useRef(colorway)
+  const latestSelectedSolid = useRef(selectedSolidId)
+  const selectionPulse = useRef({ solidId: selectedSolidId, startedAt: performance.now() })
+  const reduceMotion = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   latestTheme.current = theme
   latestColorway.current = colorway
+  latestSelectedSolid.current = selectedSolidId
+
+  useEffect(() => {
+    selectionPulse.current = { solidId: selectedSolidId, startedAt: performance.now() }
+  }, [selectedSolidId, selectionPulseKey])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -220,6 +284,7 @@ function ThreePreview({ definition, colorway, canvasRef, theme }: {
     let controls: OrbitControls | undefined
     let observer: ResizeObserver | undefined
     let holder: THREE.Group | undefined
+    const selectionOverlays: Array<{ solid: string; material: THREE.ShaderMaterial }> = []
     const scene = new THREE.Scene()
     sceneRef.current = scene
     scene.background = new THREE.Color(latestTheme.current === 'dark' ? '#181816' : '#E8E4DC')
@@ -272,8 +337,23 @@ function ThreePreview({ definition, colorway, canvasRef, theme }: {
           : definition.fixedColors[solid] ?? definition.fallbackFixedColor
         object.material = createCadMaterial(color, definition.metallicSolids.includes(solid))
       })
+      const originalMeshes: Array<{ mesh: THREE.Mesh; solid: string }> = []
+      model.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return
+        const solid = solidForMesh(object.name)
+        if (solid && customizable.has(solid)) originalMeshes.push({ mesh: object, solid })
+      })
+      originalMeshes.forEach(({ mesh, solid }) => {
+        const material = createSelectionOverlayMaterial()
+        const overlay = new THREE.Mesh(mesh.geometry, material)
+        overlay.name = `selection-overlay-${solid}`
+        overlay.renderOrder = 1000
+        mesh.add(overlay)
+        selectionOverlays.push({ solid, material })
+      })
       modelRef.current = model
       applyThreeColors(model, definition, latestColorway.current)
+      selectionPulse.current = { solidId: latestSelectedSolid.current, startedAt: performance.now() }
       const originalBounds = new THREE.Box3().setFromObject(model)
       model.position.sub(originalBounds.getCenter(new THREE.Vector3()))
       holder = new THREE.Group()
@@ -299,6 +379,21 @@ function ThreePreview({ definition, colorway, canvasRef, theme }: {
 
     function animate() {
       if (disposed || !renderer) return
+      const elapsed = performance.now() - selectionPulse.current.startedAt
+      const glow = reduceMotion.current ? (elapsed < 700 ? 0.62 : 0) : doublePulse(elapsed)
+      modelRef.current?.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return
+        const solid = solidForMesh(object.name)
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        materials.forEach((material) => {
+          if (material instanceof THREE.ShaderMaterial && material.uniforms.selectionGlow) {
+            material.uniforms.selectionGlow.value = solid === selectionPulse.current.solidId ? glow : 0
+          }
+        })
+      })
+      selectionOverlays.forEach(({ solid, material }) => {
+        material.uniforms.glowStrength.value = solid === selectionPulse.current.solidId ? glow : 0
+      })
       controls?.update()
       renderer.render(scene, camera)
       frame = requestAnimationFrame(animate)
@@ -456,6 +551,7 @@ export default function App() {
   const [hexDraft, setHexDraft] = useState(colorway[model.parts[0].id])
   const [copied, setCopied] = useState(false)
   const [filamentFinderOpen, setFilamentFinderOpen] = useState(false)
+  const [selectionPulseKey, setSelectionPulseKey] = useState(0)
   const filamentButtonRef = useRef<HTMLButtonElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const visibleParts = useMemo(() => model.parts.filter((part) => part.category === category), [category, model])
@@ -488,7 +584,14 @@ export default function App() {
   function chooseCategory(nextCategory: PartCategory) {
     setCategory(nextCategory)
     const firstPart = model.parts.find((part) => part.category === nextCategory)
-    if (firstPart) setSelectedPart(firstPart.id)
+    if (firstPart) {
+      setSelectedPart(firstPart.id)
+      setSelectionPulseKey((value) => value + 1)
+    }
+  }
+  function choosePart(partId: string) {
+    setSelectedPart(partId)
+    setSelectionPulseKey((value) => value + 1)
   }
   function chooseModel(nextModelId: string) {
     const nextModel = PRODUCT_MODEL_BY_ID[nextModelId]
@@ -497,6 +600,7 @@ export default function App() {
     setColorway({ ...nextModel.defaultColors })
     setCategory('headband')
     setSelectedPart(nextModel.parts[0].id)
+    setSelectionPulseKey((value) => value + 1)
     const url = new URL(window.location.href)
     url.searchParams.delete('config')
     url.searchParams.delete('colors')
@@ -596,7 +700,7 @@ export default function App() {
 
     <section className="configurator">
       <div className="product-area">
-        <ThreePreview definition={model} colorway={colorway} canvasRef={canvasRef} theme={theme} />
+        <ThreePreview definition={model} colorway={colorway} canvasRef={canvasRef} theme={theme} selectedSolidId={currentPart.solidId} selectionPulseKey={selectionPulseKey} />
         <div className="preview-footer"><div><span>Current model</span><strong>{model.name} · {model.parts.length} customizable parts</strong><small className={model.isCapraHeadphone ? 'model-credit' : 'model-credit external-design'}>{model.ownershipNotice}</small></div><div className="preview-actions"><a href={model.printFilesUrl} target="_blank" rel="noopener noreferrer">Get print files <small>{model.printFilesSource}</small></a><button onClick={download}>Download PNG</button></div></div>
       </div>
 
@@ -606,7 +710,7 @@ export default function App() {
           {PART_CATEGORIES.map((item) => <button key={item.id} id={`category-${item.id}`} type="button" role="tab" aria-selected={category === item.id} aria-controls="category-parts" className={category === item.id ? 'active' : ''} onClick={() => chooseCategory(item.id)}>{item.name}</button>)}
         </div>
         <div className="part-grid" id="category-parts" role="tabpanel" aria-labelledby={`category-${category}`}>
-          {visibleParts.map((part) => <button key={part.id} type="button" aria-pressed={selectedPart === part.id} className={selectedPart === part.id ? 'active' : ''} onClick={() => setSelectedPart(part.id)}>
+          {visibleParts.map((part) => <button key={part.id} type="button" aria-pressed={selectedPart === part.id} className={selectedPart === part.id ? 'active' : ''} onClick={() => choosePart(part.id)}>
             <i style={{ background: colorway[part.id] }} /><span>{part.name}</span>{(part.displayCode || !part.hideSolidId) && <small>{part.displayCode ?? part.solidId}</small>}
           </button>)}
         </div>
