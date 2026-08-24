@@ -38,6 +38,13 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('Filament Finder interface', () => {
+  it('links the Capra logo to the main Capra Audio website', () => {
+    render(<App />)
+    const brandLink = screen.getByRole('link', { name: 'Visit Capra Audio website' })
+    expect(brandLink).toHaveAttribute('href', 'https://capraaudio.com/')
+    expect(brandLink.querySelector('img')).toHaveAttribute('src', './capra-watermark.svg')
+  })
+
   it('shows the action and required affiliate disclosure', () => {
     render(<App />)
     expect(screen.getByRole('button', { name: 'Find Filaments' })).toBeVisible()

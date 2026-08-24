@@ -682,7 +682,7 @@ export default function App() {
 
   return <main className="site-shell">
     <header className="topbar">
-      <a className="wordmark" href="/" aria-label="Capra Configurator home"><b>C</b><span>CAPRA</span></a>
+      <a className="wordmark" href="https://capraaudio.com/" aria-label="Visit Capra Audio website"><span className="wordmark-logo" aria-hidden="true"><img src="./capra-watermark.svg" alt="" /></span><span>CAPRA</span></a>
       <span className="section-label">Configurator</span>
       <div className="topbar-actions">
         <label className="model-selector"><span>Model</span><select value={model.id} onChange={(event) => chooseModel(event.target.value)} aria-label="Headphone model">
