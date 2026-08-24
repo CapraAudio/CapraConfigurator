@@ -265,15 +265,19 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId,
   const latestTheme = useRef(theme)
   const latestColorway = useRef(colorway)
   const latestSelectedSolid = useRef(selectedSolidId)
-  const selectionPulse = useRef({ solidId: selectedSolidId, startedAt: performance.now() })
+  const selectionPulse = useRef<{ solidId: string; startedAt: number | null }>({ solidId: selectedSolidId, startedAt: null })
   const reduceMotion = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   latestTheme.current = theme
   latestColorway.current = colorway
   latestSelectedSolid.current = selectedSolidId
 
   useEffect(() => {
-    selectionPulse.current = { solidId: selectedSolidId, startedAt: performance.now() }
-  }, [selectedSolidId, selectionPulseKey])
+    if (selectionPulseKey === 0) {
+      selectionPulse.current = { solidId: latestSelectedSolid.current, startedAt: null }
+      return
+    }
+    selectionPulse.current = { solidId: latestSelectedSolid.current, startedAt: performance.now() }
+  }, [selectionPulseKey])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -353,7 +357,6 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId,
       })
       modelRef.current = model
       applyThreeColors(model, definition, latestColorway.current)
-      selectionPulse.current = { solidId: latestSelectedSolid.current, startedAt: performance.now() }
       const originalBounds = new THREE.Box3().setFromObject(model)
       model.position.sub(originalBounds.getCenter(new THREE.Vector3()))
       holder = new THREE.Group()
@@ -379,7 +382,8 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId,
 
     function animate() {
       if (disposed || !renderer) return
-      const elapsed = performance.now() - selectionPulse.current.startedAt
+      const pulseStartedAt = selectionPulse.current.startedAt
+      const elapsed = pulseStartedAt === null ? Number.POSITIVE_INFINITY : performance.now() - pulseStartedAt
       const glow = reduceMotion.current ? (elapsed < 700 ? 0.62 : 0) : doublePulse(elapsed)
       modelRef.current?.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return
@@ -572,6 +576,7 @@ export default function App() {
       setColorway(config.colors)
       setCategory('headband')
       setSelectedPart(restoredModel.parts[0].id)
+      setSelectionPulseKey(0)
     }
     window.addEventListener('popstate', restoreUrlState)
     return () => window.removeEventListener('popstate', restoreUrlState)
@@ -600,7 +605,7 @@ export default function App() {
     setColorway({ ...nextModel.defaultColors })
     setCategory('headband')
     setSelectedPart(nextModel.parts[0].id)
-    setSelectionPulseKey((value) => value + 1)
+    setSelectionPulseKey(0)
     const url = new URL(window.location.href)
     url.searchParams.delete('config')
     url.searchParams.delete('colors')
