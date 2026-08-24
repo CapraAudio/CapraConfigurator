@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import {
-  COLORS, LEGACY_COLORS, LEGACY_GROUPS, PART_CATEGORIES,
+  COLORS, DEFAULT_PRODUCT_MODEL, LEGACY_COLORS, LEGACY_GROUPS, PART_CATEGORIES,
   PRODUCT_MODEL_BY_ID, PRODUCT_MODELS, SATYR_4, normalizeHex,
   type PartCategory, type ProductConfigV2, type ProductModelDefinition,
 } from './products'
@@ -49,9 +49,15 @@ function readInitialConfig(): ProductConfigV2 {
     } catch { /* Fall through to legacy/default handling. */ }
   }
 
-  const colors = { ...SATYR_4.defaultColors }
+  const linkedModel = params.get('model')
+  const requestedModel = linkedModel ? PRODUCT_MODEL_BY_ID[linkedModel] : undefined
+  if (requestedModel) {
+    return { v: 2, modelId: requestedModel.id, colors: { ...requestedModel.defaultColors } }
+  }
+
   const encodedLegacy = params.get('colors')
   if (encodedLegacy) {
+    const colors = { ...SATYR_4.defaultColors }
     try {
       const legacy = decodeJson(encodedLegacy) as Record<string, string>
       for (const [groupId, solidIds] of Object.entries(LEGACY_GROUPS)) {
@@ -60,9 +66,14 @@ function readInitialConfig(): ProductConfigV2 {
         if (!color) continue
         for (const solidId of solidIds) colors[solidId] = color.toUpperCase()
       }
-    } catch { /* Malformed legacy links safely use defaults. */ }
+      return { v: 2, modelId: SATYR_4.id, colors }
+    } catch { /* Malformed legacy links safely use the site default. */ }
   }
-  return { v: 2, modelId: SATYR_4.id, colors }
+  return { v: 2, modelId: DEFAULT_PRODUCT_MODEL.id, colors: { ...DEFAULT_PRODUCT_MODEL.defaultColors } }
+}
+
+function setModelParameter(url: URL, modelId: string) {
+  url.searchParams.set('model', modelId)
 }
 
 function loadImage(source: string): Promise<HTMLImageElement> {
@@ -437,7 +448,7 @@ function FilamentFinderDialog({ open, definition, colorway, onClose }: {
 export default function App() {
   const [initialConfig] = useState(readInitialConfig)
   const [modelId, setModelId] = useState(initialConfig.modelId)
-  const model = PRODUCT_MODEL_BY_ID[modelId] ?? SATYR_4
+  const model = PRODUCT_MODEL_BY_ID[modelId] ?? DEFAULT_PRODUCT_MODEL
   const [colorway, setColorway] = useState<Colorway>(initialConfig.colors)
   const [theme, setTheme] = useState<Theme>(readTheme)
   const [category, setCategory] = useState<PartCategory>('headband')
@@ -457,6 +468,18 @@ export default function App() {
     try { window.localStorage.setItem('capra-theme', theme) } catch { /* Theme still works for this visit. */ }
   }, [theme])
   useEffect(() => { setHexDraft(currentColor) }, [currentColor, currentPart.id])
+  useEffect(() => {
+    function restoreUrlState() {
+      const config = readInitialConfig()
+      const restoredModel = PRODUCT_MODEL_BY_ID[config.modelId] ?? DEFAULT_PRODUCT_MODEL
+      setModelId(restoredModel.id)
+      setColorway(config.colors)
+      setCategory('headband')
+      setSelectedPart(restoredModel.parts[0].id)
+    }
+    window.addEventListener('popstate', restoreUrlState)
+    return () => window.removeEventListener('popstate', restoreUrlState)
+  }, [])
 
   function chooseColor(value: string) {
     const color = normalizeHex(value)
@@ -474,18 +497,25 @@ export default function App() {
     setColorway({ ...nextModel.defaultColors })
     setCategory('headband')
     setSelectedPart(nextModel.parts[0].id)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('config')
+    url.searchParams.delete('colors')
+    setModelParameter(url, nextModel.id)
+    window.history.pushState({}, '', url)
   }
   function reset() {
     setColorway({ ...model.defaultColors })
     const url = new URL(window.location.href)
     url.searchParams.delete('config')
     url.searchParams.delete('colors')
+    setModelParameter(url, model.id)
     window.history.replaceState({}, '', url)
   }
   async function share() {
     const config: ProductConfigV2 = { v: 2, modelId: model.id, colors: colorway }
     const url = new URL(window.location.href)
     url.searchParams.delete('colors')
+    setModelParameter(url, model.id)
     url.searchParams.set('config', btoa(JSON.stringify(config)))
     window.history.replaceState({}, '', url)
     try {
@@ -530,6 +560,16 @@ export default function App() {
       }
     } catch { /* Export the model without a watermark if the logo asset cannot load. */ }
 
+    const exportCredit = `${model.name.toUpperCase()} · ${model.ownershipNotice.toUpperCase()}`
+    const creditSize = Math.max(12, Math.round(exportCanvas.width * 0.014))
+    const creditInset = Math.round(exportCanvas.width * 0.025)
+    context.save()
+    context.font = `700 ${creditSize}px Montserrat, sans-serif`
+    context.textBaseline = 'bottom'
+    context.fillStyle = theme === 'dark' ? 'rgba(255,255,255,.78)' : 'rgba(23,23,25,.72)'
+    context.fillText(exportCredit, creditInset, exportCanvas.height - creditInset)
+    context.restore()
+
     const link = document.createElement('a')
     link.download = `${model.id}-colorway.png`
     link.href = exportCanvas.toDataURL('image/png')
@@ -542,7 +582,7 @@ export default function App() {
       <span className="section-label">Configurator</span>
       <div className="topbar-actions">
         <label className="model-selector"><span>Model</span><select value={model.id} onChange={(event) => chooseModel(event.target.value)} aria-label="Headphone model">
-          {PRODUCT_MODELS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {PRODUCT_MODELS.map((item) => <option key={item.id} value={item.id}>{item.selectorLabel}</option>)}
         </select></label>
         <button className="theme-toggle" type="button" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>
           <span aria-hidden="true">{theme === 'dark' ? '☀' : '◐'}</span>{theme === 'dark' ? 'Light' : 'Dark'}
@@ -557,7 +597,7 @@ export default function App() {
     <section className="configurator">
       <div className="product-area">
         <ThreePreview definition={model} colorway={colorway} canvasRef={canvasRef} theme={theme} />
-        <div className="preview-footer"><div><span>Current model</span><strong>{model.name} · {model.parts.length} customizable parts</strong></div><button onClick={download}>Download PNG</button></div>
+        <div className="preview-footer"><div><span>Current model</span><strong>{model.name} · {model.parts.length} customizable parts</strong><small className={model.isCapraHeadphone ? 'model-credit' : 'model-credit external-design'}>{model.ownershipNotice}</small></div><div className="preview-actions"><a href={model.printFilesUrl} target="_blank" rel="noopener noreferrer">Get print files <small>{model.printFilesSource}</small></a><button onClick={download}>Download PNG</button></div></div>
       </div>
 
       <aside className="controls">
@@ -591,7 +631,7 @@ export default function App() {
         <button className="share-button" onClick={share}>{copied ? 'Link copied ✓' : 'Share this colorway'}</button>
       </aside>
     </section>
-    <footer><span>Capra Configurator</span><span>Rendered from the production CAD assembly</span><span>As an Amazon Associate I earn from qualifying purchases.</span></footer>
+    <footer><span>Capra Configurator</span><span>{model.name} · {model.ownershipNotice}</span><span>As an Amazon Associate I earn from qualifying purchases.</span></footer>
     <FilamentFinderDialog
       open={filamentFinderOpen}
       definition={model}

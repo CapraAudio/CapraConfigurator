@@ -1,18 +1,27 @@
-import sys
+import argparse
 from pathlib import Path
 
 import numpy as np
 import trimesh
 from PIL import Image, ImageDraw
 
-CUSTOMIZABLE_SOLIDS = [
+SATYR_CUSTOMIZABLE_SOLIDS = [
     'S000', 'S001', 'S002', 'S003', 'S004', 'S005',
     'S006', 'S013', 'S014', 'S015', 'S016', 'S017', 'S018', 'S021',
     'S046', 'S054', 'S055', 'S056', 'S059', 'S060', 'S061', 'S063',
 ]
 
-source = Path(sys.argv[1])
-output = Path(sys.argv[2])
+parser = argparse.ArgumentParser()
+parser.add_argument('source')
+parser.add_argument('output')
+parser.add_argument('--name', default='satyr-4')
+parser.add_argument('--mask-prefix', default='')
+parser.add_argument('--solids', help='Comma-separated customizable solid IDs')
+args = parser.parse_args()
+
+customizable_solids = args.solids.split(',') if args.solids else SATYR_CUSTOMIZABLE_SOLIDS
+source = Path(args.source)
+output = Path(args.output)
 output.mkdir(parents=True, exist_ok=True)
 scene = trimesh.load(source, force='scene')
 center = (scene.bounds[0] + scene.bounds[1]) / 2
@@ -21,7 +30,7 @@ angle_y, angle_x = np.radians(-22), np.radians(8)
 ry = np.array([[np.cos(angle_y), 0, np.sin(angle_y)], [0, 1, 0], [-np.sin(angle_y), 0, np.cos(angle_y)]])
 rx = np.array([[1, 0, 0], [0, np.cos(angle_x), -np.sin(angle_x)], [0, np.sin(angle_x), np.cos(angle_x)]])
 rotation = rx @ ry
-solid_codes = {solid: index + 1 for index, solid in enumerate(CUSTOMIZABLE_SOLIDS)}
+solid_codes = {solid: index + 1 for index, solid in enumerate(customizable_solids)}
 
 records = []
 projected_points = []
@@ -57,10 +66,10 @@ for _, poly, code, brightness in sorted(records, key=lambda item: item[0]):
     base_draw.polygon(coords, fill=(brightness, brightness, brightness))
     segment_draw.polygon(coords, fill=code)
 
-base.save(output / 'satyr-4-preview.png', optimize=True)
+base.save(output / f'{args.name}-preview.png', optimize=True)
 segment_array = np.asarray(segments)
 for solid, code in solid_codes.items():
     mask = Image.fromarray(np.where(segment_array == code, 255, 0).astype(np.uint8), mode='L')
-    mask.save(output / f'mask-{solid.lower()}.png', optimize=True)
+    mask.save(output / f'mask-{args.mask_prefix}{solid.lower()}.png', optimize=True)
 
-print(f'Rendered {len(records):,} visible triangles and {len(CUSTOMIZABLE_SOLIDS)} color masks')
+print(f'Rendered {len(records):,} visible triangles and {len(customizable_solids)} color masks')

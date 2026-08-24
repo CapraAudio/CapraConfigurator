@@ -19,6 +19,12 @@ export type ColorOption = {
 export type ProductModelDefinition = {
   id: string
   name: string
+  selectorLabel: string
+  designer: string
+  ownershipNotice: string
+  isCapraHeadphone: boolean
+  printFilesUrl: string
+  printFilesSource: string
   assetUrl: string
   previewUrl: string
   maskUrl: (solidId: string) => string
@@ -114,6 +120,12 @@ const satyr4Defaults: Record<string, string> = {
 export const SATYR_4: ProductModelDefinition = {
   id: 'satyr-4',
   name: 'Satyr 4',
+  selectorLabel: 'Satyr 4',
+  designer: 'Capra Audio',
+  ownershipNotice: 'A Capra Audio headphone',
+  isCapraHeadphone: true,
+  printFilesUrl: 'https://www.printables.com/model/1548276-satyr-4-diy-hifi-headphones',
+  printFilesSource: 'Printables',
   assetUrl: publicAsset('satyr-4-grouped.glb'),
   previewUrl: publicAsset('satyr-4-preview.png'),
   maskUrl: (solidId) => publicAsset(`mask-${solidId.toLowerCase()}.png`),
@@ -131,8 +143,70 @@ export const SATYR_4: ProductModelDefinition = {
   fallbackFixedColor: '#625F59',
 }
 
-export const PRODUCT_MODELS: ProductModelDefinition[] = [SATYR_4]
+const openOmegaParts: ProductPart[] = [
+  { id: 'S000', solidId: 'S000', name: 'Headband', category: 'headband', allowedFilamentMaterials: TPU_95A },
+  { id: 'S001', solidId: 'S001', name: 'Right Pivot Block', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
+  { id: 'S002', solidId: 'S002', name: 'Right Adjustment Arm', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
+  { id: 'S003', solidId: 'S003', name: 'Left Pivot Block', category: 'headband', allowedFilamentMaterials: STRUCTURAL },
+  { id: 'S004', solidId: 'S004', name: 'Left Adjustment Arm', category: 'headband', allowedFilamentMaterials: ADJUSTMENT },
+  { id: 'S005', solidId: 'S005', name: 'Comfort Strap', category: 'headband', allowedFilamentMaterials: TPU_95A },
+  { id: 'S006', solidId: 'S006', name: 'Right Yoke', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S008', solidId: 'S008', name: 'Right Cup', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S011', solidId: 'S011', name: 'Right Driver Cap', category: 'right-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S019', solidId: 'S019', name: 'Left Yoke', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S021', solidId: 'S021', name: 'Left Cup', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+  { id: 'S031', solidId: 'S031', name: 'Left Driver Cap', category: 'left-cup', allowedFilamentMaterials: CUP_PART },
+]
+
+const openOmegaDefaults: Record<string, string> = {
+  S000: '#E53935',
+  S001: '#E53935',
+  S002: '#383838',
+  S003: '#1E88E5',
+  S004: '#383838',
+  S005: '#171719',
+  S006: '#E53935',
+  S008: '#383838',
+  S011: '#E53935',
+  S019: '#E53935',
+  S021: '#383838',
+  S031: '#E53935',
+}
+
+export const OPEN_OMEGA: ProductModelDefinition = {
+  id: 'open-omega',
+  name: 'Open-Omega',
+  selectorLabel: 'Open-Omega — DMS',
+  designer: 'DMS',
+  ownershipNotice: 'Designed by DMS · Not a Capra headphone',
+  isCapraHeadphone: false,
+  printFilesUrl: 'https://github.com/DMS3tv/Open-Omega',
+  printFilesSource: 'DMS GitHub',
+  assetUrl: publicAsset('open-omega-grouped.glb'),
+  previewUrl: publicAsset('open-omega-preview.png'),
+  maskUrl: (solidId) => publicAsset(`mask-open-omega-${solidId.toLowerCase()}.png`),
+  initialRotation: [0.14, -0.61, 0],
+  parts: openOmegaParts,
+  defaultColors: openOmegaDefaults,
+  fixedColors: {
+    S007: '#171719', S020: '#171719',
+    S009: '#171719', S022: '#171719',
+    S010: '#171719', S023: '#171719',
+    S012: '#F6F6F3', S024: '#F6F6F3',
+    S013: '#1E1E1E', S025: '#1E1E1E',
+    S014: '#F3CB7C', S026: '#F3CB7C',
+    S015: '#C8CDD1', S027: '#C8CDD1',
+    S016: '#1E1E1E', S028: '#1E1E1E',
+    S017: '#F6F6F3', S029: '#F6F6F3',
+    S018: '#A0A0A0', S030: '#A0A0A0',
+  },
+  metallicSolids: ['S014', 'S015', 'S018', 'S026', 'S027', 'S030'],
+  fallbackFixedColor: '#343438',
+}
+
+export const PRODUCT_MODELS: ProductModelDefinition[] = [SATYR_4, OPEN_OMEGA]
 export const PRODUCT_MODEL_BY_ID = Object.fromEntries(PRODUCT_MODELS.map((model) => [model.id, model])) as Record<string, ProductModelDefinition>
+export const DEFAULT_PRODUCT_MODEL = SATYR_4
 
 export const LEGACY_COLORS: Record<string, string> = {
   ink: '#171719', oat: '#D8CDBB', clay: '#C66A47', moss: '#73816B',

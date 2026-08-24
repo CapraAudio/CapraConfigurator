@@ -1,8 +1,15 @@
 # Capra Configurator
 
-Interactive 3D headphone color configurator for Capra Audio. The current model
-is Satyr 4, with 22 independently customizable CAD parts, responsive camera
-framing, shareable colorways, downloads, and light/dark themes.
+Interactive 3D headphone color configurator with responsive camera framing,
+shareable colorways, downloads, filament matching, and light/dark themes. It
+currently includes Capra Audio's Satyr 4 and Open-Omega, an independent
+headphone designed by DMS that is not a Capra headphone.
+
+The base URL currently opens Satyr 4. Each model also has a permanent,
+static-host-compatible link: `/?model=satyr-4` and `/?model=open-omega`.
+`DEFAULT_PRODUCT_MODEL` controls what the base URL opens, so it can change
+later without breaking either permanent model link. Shared colorway links add
+the existing versioned `config` parameter alongside the model parameter.
 
 ## Development
 
