@@ -294,12 +294,63 @@ export const MODEL_183X: ProductModelDefinition = {
   fallbackFixedColor: '#74787D',
 }
 
+const HEADAMAME_RIGID: FilamentMaterialId[] = ['petg', 'pctg', 'abs', 'asa', 'pla']
+const headamameV2Parts: ProductPart[] = [
+  { id: 'S002', solidId: 'S002', name: 'Left Headband Cover', hideSolidId: true, category: 'headband', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S003', solidId: 'S003', name: 'Left Headband Clamp', hideSolidId: true, category: 'headband', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S004', solidId: 'S004', name: 'Headband Spring', hideSolidId: true, category: 'headband', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S005', solidId: 'S005', name: 'Right Headband Cover', hideSolidId: true, category: 'headband', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S006', solidId: 'S006', name: 'Right Headband Clamp', hideSolidId: true, category: 'headband', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S000', solidId: 'S000', name: 'Left Earpad Mount', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S001', solidId: 'S001', name: 'Left 50 mm Driver Mount', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S008', solidId: 'S008', name: 'Left Outer Cone', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S010', solidId: 'S010', name: 'Left Cone Face', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S011', solidId: 'S011', name: 'Left Headband Mount', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S013', solidId: 'S013', name: 'Left Cup Clamp', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S017', solidId: 'S017', name: 'Right Earpad Mount', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S021', solidId: 'S021', name: 'Right 50 mm Driver Mount', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S019', solidId: 'S019', name: 'Right Outer Cone', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S016', solidId: 'S016', name: 'Right Cone Face', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S015', solidId: 'S015', name: 'Right Headband Mount', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+  { id: 'S014', solidId: 'S014', name: 'Right Cup Clamp', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: HEADAMAME_RIGID },
+]
+
+export const HEADAMAME_V2: ProductModelDefinition = {
+  id: 'headamame-v2',
+  name: 'Head(amame) v2',
+  selectorLabel: 'Head(amame) v2 — Head(amame)',
+  designer: 'Head(amame)',
+  ownershipNotice: 'Designed by Head(amame)',
+  isCapraHeadphone: false,
+  printFilesUrl: 'https://headamame.com/products/headamame-files',
+  printFilesSource: 'Head(amame)',
+  assetUrl: publicAsset('headamame-v2.glb'),
+  previewUrl: publicAsset('headamame-v2-preview.png'),
+  maskUrl: (partId) => publicAsset(`mask-headamame-v2-${partId.toLowerCase()}.png`),
+  initialRotation: [0.08, 2.5916, 0],
+  parts: headamameV2Parts,
+  defaultColors: {
+    S000: '#F96854', S001: '#F96854', S002: '#F96854', S003: '#F96854',
+    S004: '#F6F6F3', S005: '#F96854', S006: '#F96854', S008: '#F96854',
+    S010: '#F96854', S011: '#FDD835', S013: '#FFFFFF', S014: '#FFFFFF',
+    S015: '#FDD835', S016: '#F96854', S017: '#F96854', S019: '#F96854',
+    S021: '#F96854',
+  },
+  fixedColors: {
+    S007: '#404040', S009: '#FFFFFF', S012: '#FFFFFF', S018: '#FFFFFF',
+    S020: '#FFFFFF', S022: '#272727', S023: '#272727',
+  },
+  metallicSolids: [],
+  fallbackFixedColor: '#343438',
+}
+
 // Keep unreleased models routable for private local review, but exclude them
 // from PRODUCT_MODELS so they never appear in the public model selector.
 const SHOW_183X_IN_MODEL_SELECTOR = false
 export const PRODUCT_MODELS: ProductModelDefinition[] = [
   SATYR_4,
   OPEN_OMEGA,
+  HEADAMAME_V2,
   ...(SHOW_183X_IN_MODEL_SELECTOR ? [MODEL_183X] : []),
 ]
 const ROUTABLE_PRODUCT_MODELS = [...PRODUCT_MODELS, MODEL_183X]

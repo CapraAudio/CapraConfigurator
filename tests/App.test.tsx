@@ -10,7 +10,7 @@ vi.mock('../src/filaments', async (importOriginal) => {
 
 import App from '../src/App'
 import { findFilamentRecommendations } from '../src/filaments'
-import { MODEL_183X, OPEN_OMEGA, PRODUCT_MODEL_BY_ID, SATYR_4 } from '../src/products'
+import { HEADAMAME_V2, MODEL_183X, OPEN_OMEGA, PRODUCT_MODEL_BY_ID, SATYR_4 } from '../src/products'
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', '') }
@@ -183,5 +183,34 @@ describe('183X stock and replacement model', () => {
     expect(screen.getByRole('option', { name: 'Private preview' })).toBeInTheDocument()
     expect(screen.getByText('183X · 17 customizable parts')).toBeVisible()
     expect(screen.queryByRole('link', { name: /Get print files/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('Head(amame) v2 public model', () => {
+  it('registers the assembled public model and its mirrored part categories', () => {
+    expect(PRODUCT_MODEL_BY_ID['headamame-v2']).toBe(HEADAMAME_V2)
+    expect(HEADAMAME_V2.parts).toHaveLength(17)
+    expect(HEADAMAME_V2.parts.filter((part) => part.category === 'headband')).toHaveLength(5)
+    expect(HEADAMAME_V2.parts.filter((part) => part.category === 'left-cup')).toHaveLength(6)
+    expect(HEADAMAME_V2.parts.filter((part) => part.category === 'right-cup')).toHaveLength(6)
+    expect(HEADAMAME_V2.designer).toBe('Head(amame)')
+    expect(HEADAMAME_V2.parts.every((part) => part.hideSolidId)).toBe(true)
+    expect(HEADAMAME_V2.parts.filter((part) => part.category === 'left-cup').map((part) => part.name.replace('Left ', ''))).toEqual(
+      HEADAMAME_V2.parts.filter((part) => part.category === 'right-cup').map((part) => part.name.replace('Right ', '')),
+    )
+    expect(HEADAMAME_V2.defaultColors.S011).toBe('#FDD835')
+    expect(HEADAMAME_V2.defaultColors.S015).toBe('#FDD835')
+  })
+
+  it('appears in the model selector and links to the official print files', () => {
+    window.history.replaceState({}, '', '/?model=headamame-v2')
+    render(<App />)
+    expect(screen.getByRole('combobox', { name: 'Headphone model' })).toHaveValue('headamame-v2')
+    expect(screen.getByRole('option', { name: 'Head(amame) v2 — Head(amame)' })).toBeInTheDocument()
+    expect(screen.getByText('Head(amame) v2 · 17 customizable parts')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Inner Cone|Cup Detail/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Get print files/i })).toHaveAttribute(
+      'href', 'https://headamame.com/products/headamame-files',
+    )
   })
 })
