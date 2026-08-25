@@ -8,9 +8,10 @@ vi.mock('../src/filaments', async (importOriginal) => {
   return { ...actual, findFilamentRecommendations: vi.fn().mockResolvedValue([]) }
 })
 
-import App from '../src/App'
+import App, { configuratorPartIdForObject } from '../src/App'
 import { findFilamentRecommendations } from '../src/filaments'
 import { HEADAMAME_V2, MODEL_183X, OPEN_OMEGA, PRODUCT_MODEL_BY_ID, SATYR_4 } from '../src/products'
+import * as THREE from 'three'
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', '') }
@@ -56,6 +57,20 @@ describe('Filament Finder interface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Find Filaments' }))
     expect(screen.getByRole('dialog', { name: 'Find Filaments' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Close filament finder' })).toHaveFocus()
+  })
+})
+
+describe('3D model part picking', () => {
+  it('resolves a selection overlay to its customizable parent part', () => {
+    const root = new THREE.Group()
+    const partMesh = new THREE.Mesh()
+    partMesh.userData.configuratorPartId = 'S021'
+    const overlay = new THREE.Mesh()
+    partMesh.add(overlay)
+    root.add(partMesh)
+
+    expect(configuratorPartIdForObject(overlay, root)).toBe('S021')
+    expect(configuratorPartIdForObject(new THREE.Mesh(), root)).toBeUndefined()
   })
 })
 

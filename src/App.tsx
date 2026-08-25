@@ -161,6 +161,26 @@ function buildMeshBindings(definition: ProductModelDefinition) {
   return bindings
 }
 
+export function configuratorPartIdForObject(object: THREE.Object3D, root: THREE.Object3D) {
+  let current: THREE.Object3D | null = object
+  while (current && current !== root) {
+    const partId = current.userData.configuratorPartId
+    if (typeof partId === 'string') return partId
+    current = current.parent
+  }
+  return undefined
+}
+
+function isVisibleThroughRoot(object: THREE.Object3D, root: THREE.Object3D) {
+  let current: THREE.Object3D | null = object
+  while (current) {
+    if (!current.visible) return false
+    if (current === root) return true
+    current = current.parent
+  }
+  return false
+}
+
 function isReplacementActive(definition: ProductModelDefinition, colorway: Colorway, part: ProductModelDefinition['parts'][number]) {
   if (!part.replacementSolidIds?.length) return false
   const current = (colorway[part.id] ?? definition.defaultColors[part.id]).toUpperCase()
@@ -294,13 +314,14 @@ function doublePulse(elapsedMilliseconds: number) {
   return 0
 }
 
-function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, selectionPulseKey }: {
+function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, selectionPulseKey, onSelectPart }: {
   definition: ProductModelDefinition
   colorway: Colorway
   canvasRef: React.RefObject<HTMLCanvasElement>
   theme: Theme
   selectedPartId: string
   selectionPulseKey: number
+  onSelectPart: (partId: string) => void
 }) {
   const [mode, setMode] = useState<'loading' | 'three' | 'fallback'>('loading')
   const modelRef = useRef<THREE.Object3D | null>(null)
@@ -308,11 +329,13 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, 
   const latestTheme = useRef(theme)
   const latestColorway = useRef(colorway)
   const latestSelectedSolid = useRef(selectedPartId)
+  const latestOnSelectPart = useRef(onSelectPart)
   const selectionPulse = useRef<{ solidId: string; startedAt: number | null }>({ solidId: selectedPartId, startedAt: null })
   const reduceMotion = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   latestTheme.current = theme
   latestColorway.current = colorway
   latestSelectedSolid.current = selectedPartId
+  latestOnSelectPart.current = onSelectPart
 
   useEffect(() => {
     if (selectionPulseKey === 0) {
@@ -331,6 +354,9 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, 
     let controls: OrbitControls | undefined
     let observer: ResizeObserver | undefined
     let holder: THREE.Group | undefined
+    let pointerStart: { id: number; x: number; y: number } | undefined
+    const raycaster = new THREE.Raycaster()
+    const pointer = new THREE.Vector2()
     const selectionOverlays: Array<{ solid: string; material: THREE.ShaderMaterial }> = []
     const scene = new THREE.Scene()
     sceneRef.current = scene
@@ -350,6 +376,42 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, 
     controls = new OrbitControls(camera, canvas)
     controls.enableDamping = true
     controls.enablePan = false
+
+    function selectPartAt(clientX: number, clientY: number) {
+      const model = modelRef.current
+      if (!model) return
+      const bounds = canvas!.getBoundingClientRect()
+      if (!bounds.width || !bounds.height) return
+      pointer.set(
+        ((clientX - bounds.left) / bounds.width) * 2 - 1,
+        -((clientY - bounds.top) / bounds.height) * 2 + 1,
+      )
+      model.updateWorldMatrix(true, true)
+      camera.updateMatrixWorld()
+      raycaster.setFromCamera(pointer, camera)
+      const nearestVisibleHit = raycaster.intersectObject(model, true)
+        .find((hit) => isVisibleThroughRoot(hit.object, model))
+      if (!nearestVisibleHit) return
+      const partId = configuratorPartIdForObject(nearestVisibleHit.object, model)
+      if (partId) latestOnSelectPart.current(partId)
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (event.button !== 0) return
+      pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY }
+    }
+
+    function handlePointerUp(event: PointerEvent) {
+      if (!pointerStart || pointerStart.id !== event.pointerId) return
+      const distance = Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y)
+      pointerStart = undefined
+      if (distance <= 6) selectPartAt(event.clientX, event.clientY)
+    }
+
+    function handlePointerCancel() { pointerStart = undefined }
+    canvas.addEventListener('pointerdown', handlePointerDown)
+    canvas.addEventListener('pointerup', handlePointerUp)
+    canvas.addEventListener('pointercancel', handlePointerCancel)
 
     function fitCamera() {
       if (!holder || !controls) return
@@ -454,6 +516,9 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, 
       disposed = true
       cancelAnimationFrame(frame)
       observer?.disconnect()
+      canvas.removeEventListener('pointerdown', handlePointerDown)
+      canvas.removeEventListener('pointerup', handlePointerUp)
+      canvas.removeEventListener('pointercancel', handlePointerCancel)
       controls?.dispose()
       disposeObject(scene)
       renderer?.dispose()
@@ -471,7 +536,7 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, 
   return <div className="preview-frame three-preview">
     <canvas ref={canvasRef} aria-label={`Interactive 3D ${definition.name} headphone model`} />
     {mode === 'loading' && <div className="preview-status">Loading 3D model…</div>}
-    <div className="preview-caption"><span>Drag to rotate · Scroll to zoom</span><span>Interactive 3D</span></div>
+    <div className="preview-caption"><span>Click a part · Drag to rotate · Scroll to zoom</span><span>Interactive 3D</span></div>
   </div>
 }
 
@@ -641,6 +706,9 @@ export default function App() {
     }
   }
   function choosePart(partId: string) {
+    const part = model.parts.find((candidate) => candidate.id === partId)
+    if (!part) return
+    setCategory(part.category)
     setSelectedPart(partId)
     setSelectionPulseKey((value) => value + 1)
   }
@@ -752,7 +820,7 @@ export default function App() {
 
     <section className="configurator">
       <div className="product-area">
-        <ThreePreview definition={model} colorway={colorway} canvasRef={canvasRef} theme={theme} selectedPartId={currentPart.id} selectionPulseKey={selectionPulseKey} />
+        <ThreePreview definition={model} colorway={colorway} canvasRef={canvasRef} theme={theme} selectedPartId={currentPart.id} selectionPulseKey={selectionPulseKey} onSelectPart={choosePart} />
         <div className="preview-footer"><div><span>Current model</span><strong>{model.name} · {model.parts.length} customizable parts</strong><small className={model.isCapraHeadphone ? 'model-credit' : 'model-credit external-design'}>{model.ownershipNotice}</small></div><div className="preview-actions">{model.printFilesUrl && <a href={model.printFilesUrl} target="_blank" rel="noopener noreferrer">Get print files <small>{model.printFilesSource}</small></a>}<button onClick={download}>Download PNG</button></div></div>
       </div>
 
