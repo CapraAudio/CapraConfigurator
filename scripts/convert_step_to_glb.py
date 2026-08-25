@@ -10,7 +10,7 @@ import trimesh
 from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
 from OCP.BRep import BRep_Tool
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
-from OCP.GeomAbs import GeomAbs_Circle, GeomAbs_Cone, GeomAbs_Plane
+from OCP.GeomAbs import GeomAbs_Circle, GeomAbs_Cone, GeomAbs_Cylinder, GeomAbs_Plane
 from OCP.Quantity import Quantity_Color, Quantity_TOC_sRGB
 from OCP.STEPCAFControl import STEPCAFControl_Reader
 from OCP.TCollection import TCollection_ExtendedString
@@ -166,6 +166,45 @@ def stitch_edge_loop(chains, tolerance=0.02):
     return points[keep]
 
 
+def append_missing_cylinder(face, solid, vertices, triangles):
+    """Rebuild trimmed cylindrical faces that OpenCascade leaves unmeshed."""
+    surface = BRepAdaptor_Surface(face)
+    if surface.GetType() != GeomAbs_Cylinder:
+        return False
+    chains = []
+    edge_iterator = TopExp_Explorer(face, TopAbs_EDGE)
+    while edge_iterator.More():
+        chains.append(edge_polygon_points(TopoDS.Edge_s(edge_iterator.Current()), face, solid))
+        edge_iterator.Next()
+    points_3d = stitch_edge_loop(chains)
+    if points_3d is None or len(points_3d) < 3:
+        return False
+
+    cylinder = surface.Cylinder()
+    position = cylinder.Position()
+    origin = np.asarray(position.Location().Coord())
+    x_axis = np.asarray(position.XDirection().Coord())
+    y_axis = np.asarray(position.YDirection().Coord())
+    z_axis = np.asarray(position.Direction().Coord())
+    first_u, last_u = surface.FirstUParameter(), surface.LastUParameter()
+    relative = points_3d - origin
+    u = np.arctan2(relative @ y_axis, relative @ x_axis)
+    while np.median(u) < first_u:
+        u += 2 * np.pi
+    while np.median(u) > last_u:
+        u -= 2 * np.pi
+    points_2d = np.column_stack((u, relative @ z_axis, np.zeros(len(points_3d))))
+    face_triangles = triangulate_planar_polygon(points_2d)
+    if not face_triangles:
+        return False
+    vertex_offset = len(vertices)
+    vertices.extend(map(tuple, points_3d))
+    if face.Orientation() == TopAbs_REVERSED:
+        face_triangles = [(a, c, b) for a, b, c in face_triangles]
+    triangles.extend((vertex_offset + a, vertex_offset + b, vertex_offset + c) for a, b, c in face_triangles)
+    return True
+
+
 def triangulate_planar_polygon(points):
     """Ear-clip a simple planar 3D polygon and return local triangle indices."""
     centered = points - points.mean(axis=0)
@@ -237,6 +276,7 @@ def append_missing_planar_face(face, solid, vertices, triangles):
     triangles.extend((vertex_offset + a, vertex_offset + b, vertex_offset + c) for a, b, c in face_triangles)
     return True
 
+
 while solids.More():
     solid = TopoDS.Solid_s(solids.Current())
     vertices, triangles = [], []
@@ -262,9 +302,9 @@ while solids.More():
                     (vertex_offset + a - 1, vertex_offset + b - 1, vertex_offset + c - 1)
                 )
         else:
-            append_missing_cone(face, solid, vertices, triangles) or append_missing_planar_face(
+            append_missing_cone(face, solid, vertices, triangles) or append_missing_cylinder(
                 face, solid, vertices, triangles
-            )
+            ) or append_missing_planar_face(face, solid, vertices, triangles)
 
         face_iterator.Next()
 
