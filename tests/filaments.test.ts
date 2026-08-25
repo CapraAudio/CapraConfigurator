@@ -6,7 +6,7 @@ import {
   findFilamentRecommendations,
   type FilamentSwatch,
 } from '../src/filaments'
-import { SATYR_4, type FilamentMaterialId } from '../src/products'
+import { MODEL_183X, SATYR_4, type FilamentMaterialId } from '../src/products'
 
 const apiSwatch = (overrides: Record<string, unknown> = {}) => ({
   id: 10,
@@ -49,6 +49,18 @@ describe('material metadata and grouping', () => {
     const flexible = combinations.find((item) => item.material === 'tpu-95a')
     expect(flexible?.color).toBe('#ABCDEF')
     expect(flexible?.parts.map((part) => part.id)).toEqual(['S000', 'S005', 'S021', 'S063'])
+  })
+
+  it('excludes stock 183X parts and includes only changed replacement geometry', () => {
+    expect(buildFilamentCombinations(MODEL_183X, MODEL_183X.defaultColors)).toEqual([])
+
+    const changedRigidPart = { ...MODEL_183X.defaultColors, '183X-A06': '#E53935' }
+    const rigidCombinations = buildFilamentCombinations(MODEL_183X, changedRigidPart)
+    expect(rigidCombinations).toHaveLength(5)
+    expect(rigidCombinations.every((item) => item.parts.map((part) => part.id).join() === '183X-A06')).toBe(true)
+
+    const changedStrap = { ...MODEL_183X.defaultColors, '183X-H02': '#43A047' }
+    expect(buildFilamentCombinations(MODEL_183X, changedStrap).map((item) => item.material)).toEqual(['tpu-95a'])
   })
 })
 

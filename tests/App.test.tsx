@@ -10,7 +10,7 @@ vi.mock('../src/filaments', async (importOriginal) => {
 
 import App from '../src/App'
 import { findFilamentRecommendations } from '../src/filaments'
-import { OPEN_OMEGA, PRODUCT_MODEL_BY_ID, SATYR_4 } from '../src/products'
+import { MODEL_183X, OPEN_OMEGA, PRODUCT_MODEL_BY_ID, SATYR_4 } from '../src/products'
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', '') }
@@ -155,5 +155,33 @@ describe('Satyr 4 guide labels', () => {
       S059: ['Left Yoke', 'S4-02'], S060: ['Left Inner Grille + Trim', 'S4-10+S4-09'],
       S061: ['Left Outer Grille', 'S4-11'], S063: ['Left Spacer', 'S4-06'],
     })
+  })
+})
+
+describe('183X stock and replacement model', () => {
+  it('registers 17 independently configurable replacement parts with corrected cup sides', () => {
+    expect(PRODUCT_MODEL_BY_ID['183x']).toBe(MODEL_183X)
+    expect(MODEL_183X.parts).toHaveLength(17)
+    expect(MODEL_183X.parts.filter((part) => part.category === 'headband')).toHaveLength(5)
+    expect(MODEL_183X.parts.filter((part) => part.category === 'left-cup')).toHaveLength(6)
+    expect(MODEL_183X.parts.filter((part) => part.category === 'right-cup')).toHaveLength(6)
+    expect(MODEL_183X.parts.every((part) => part.replacementSolidIds?.length === 1)).toBe(true)
+    expect(MODEL_183X.parts.find((part) => part.id === '183X-A08')).toMatchObject({ name: 'Right Outer Grille', category: 'right-cup' })
+    expect(MODEL_183X.parts.find((part) => part.id === '183X-B08')).toMatchObject({ name: 'Left Outer Grille', category: 'left-cup' })
+    expect(MODEL_183X.defaultColors).toMatchObject({
+      '183X-R-FWD': '#000000',
+      '183X-R-REAR': '#E53935',
+      '183X-L-FWD': '#000000',
+      '183X-L-REAR': '#1E88E5',
+    })
+  })
+
+  it('remains available by private route without appearing in the model selector', () => {
+    window.history.replaceState({}, '', '/?model=183x')
+    render(<App />)
+    expect(screen.queryByRole('option', { name: '183X' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Private preview' })).toBeInTheDocument()
+    expect(screen.getByText('183X · 17 customizable parts')).toBeVisible()
+    expect(screen.queryByRole('link', { name: /Get print files/i })).not.toBeInTheDocument()
   })
 })

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import {
   COLORS, DEFAULT_PRODUCT_MODEL, LEGACY_COLORS, LEGACY_GROUPS, PART_CATEGORIES,
   PRODUCT_MODEL_BY_ID, PRODUCT_MODELS, SATYR_4, normalizeHex,
@@ -96,7 +97,7 @@ function ProductPreview({ definition, colorway, canvasRef }: {
       try {
         const [base, ...masks] = await Promise.all([
           loadImage(definition.previewUrl),
-          ...definition.parts.map((part) => loadImage(definition.maskUrl(part.solidId))),
+          ...definition.parts.map((part) => loadImage(definition.maskUrl(part.id))),
         ])
         if (cancelled || !canvasRef.current) return
         const canvas = canvasRef.current
@@ -136,20 +137,62 @@ function ProductPreview({ definition, colorway, canvasRef }: {
   </div>
 }
 
-function solidForMesh(name: string) {
-  const match = name.match(/solid_(\d+)/i)
-  return match ? `S${match[1].padStart(3, '0')}` : undefined
+function meshIdForMesh(name: string) {
+  const replacement = name.match(/replacement_(\d+)/i)
+  if (replacement) return `R${replacement[1].padStart(3, '0')}`
+  const stock = name.match(/solid_(\d+)/i)
+  return stock ? `S${stock[1].padStart(3, '0')}` : undefined
+}
+
+type MeshBinding = {
+  part: ProductModelDefinition['parts'][number]
+  role: 'direct' | 'stock' | 'stock-accessory' | 'replacement'
+}
+
+function buildMeshBindings(definition: ProductModelDefinition) {
+  const bindings = new Map<string, MeshBinding>()
+  definition.parts.forEach((part) => {
+    const hasReplacement = Boolean(part.replacementSolidIds?.length)
+    const stockIds = part.stockSolidIds ?? [part.solidId]
+    stockIds.forEach((meshId) => bindings.set(meshId, { part, role: hasReplacement ? 'stock' : 'direct' }))
+    part.stockAccessorySolidIds?.forEach((meshId) => bindings.set(meshId, { part, role: 'stock-accessory' }))
+    part.replacementSolidIds?.forEach((meshId) => bindings.set(meshId, { part, role: 'replacement' }))
+  })
+  return bindings
+}
+
+function isReplacementActive(definition: ProductModelDefinition, colorway: Colorway, part: ProductModelDefinition['parts'][number]) {
+  if (!part.replacementSolidIds?.length) return false
+  const current = (colorway[part.id] ?? definition.defaultColors[part.id]).toUpperCase()
+  return current !== definition.defaultColors[part.id].toUpperCase()
 }
 
 function applyThreeColors(model: THREE.Object3D, definition: ProductModelDefinition, colorway: Colorway) {
-  const customizable = new Set(definition.parts.map((part) => part.solidId))
+  const bindings = buildMeshBindings(definition)
   model.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return
-    const solid = solidForMesh(object.name)
-    if (!solid) return
-    const color = customizable.has(solid)
-      ? colorway[solid] ?? definition.defaultColors[solid]
-      : definition.fixedColors[solid] ?? definition.fallbackFixedColor
+    if (!(object instanceof THREE.Mesh) || object.userData.selectionOverlay) return
+    const meshId = meshIdForMesh(object.name)
+    if (!meshId) return
+    if (definition.hiddenSolidIds?.includes(meshId)) {
+      object.visible = false
+      return
+    }
+    const binding = bindings.get(meshId)
+    let color = definition.fixedColors[meshId] ?? definition.fallbackFixedColor
+    object.visible = true
+    if (binding) {
+      const replacementActive = isReplacementActive(definition, colorway, binding.part)
+      const currentColor = colorway[binding.part.id] ?? definition.defaultColors[binding.part.id]
+      if (binding.role === 'replacement') {
+        object.visible = replacementActive
+        color = currentColor
+      } else if (binding.role === 'stock' || binding.role === 'stock-accessory') {
+        object.visible = !replacementActive
+        color = binding.role === 'stock-accessory'
+          ? definition.fixedColors[meshId] ?? definition.fallbackFixedColor
+          : definition.defaultColors[binding.part.id]
+      } else color = currentColor
+    }
     const materials = Array.isArray(object.material) ? object.material : [object.material]
     materials.forEach((material) => {
       if (material instanceof THREE.ShaderMaterial && material.uniforms.baseColor) material.uniforms.baseColor.value.set(color)
@@ -251,12 +294,12 @@ function doublePulse(elapsedMilliseconds: number) {
   return 0
 }
 
-function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId, selectionPulseKey }: {
+function ThreePreview({ definition, colorway, canvasRef, theme, selectedPartId, selectionPulseKey }: {
   definition: ProductModelDefinition
   colorway: Colorway
   canvasRef: React.RefObject<HTMLCanvasElement>
   theme: Theme
-  selectedSolidId: string
+  selectedPartId: string
   selectionPulseKey: number
 }) {
   const [mode, setMode] = useState<'loading' | 'three' | 'fallback'>('loading')
@@ -264,12 +307,12 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId,
   const sceneRef = useRef<THREE.Scene | null>(null)
   const latestTheme = useRef(theme)
   const latestColorway = useRef(colorway)
-  const latestSelectedSolid = useRef(selectedSolidId)
-  const selectionPulse = useRef<{ solidId: string; startedAt: number | null }>({ solidId: selectedSolidId, startedAt: null })
+  const latestSelectedSolid = useRef(selectedPartId)
+  const selectionPulse = useRef<{ solidId: string; startedAt: number | null }>({ solidId: selectedPartId, startedAt: null })
   const reduceMotion = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   latestTheme.current = theme
   latestColorway.current = colorway
-  latestSelectedSolid.current = selectedSolidId
+  latestSelectedSolid.current = selectedPartId
 
   useEffect(() => {
     if (selectionPulseKey === 0) {
@@ -328,29 +371,32 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId,
       controls.update()
     }
 
-    new GLTFLoader().load(definition.assetUrl, (gltf) => {
+    new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(definition.assetUrl, (gltf) => {
       if (disposed) { disposeObject(gltf.scene); return }
       const model = gltf.scene
-      const customizable = new Set(definition.parts.map((part) => part.solidId))
+      const bindings = buildMeshBindings(definition)
       model.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return
-        const solid = solidForMesh(object.name)
-        if (!solid) return
-        const color = customizable.has(solid)
-          ? latestColorway.current[solid] ?? definition.defaultColors[solid]
-          : definition.fixedColors[solid] ?? definition.fallbackFixedColor
-        object.material = createCadMaterial(color, definition.metallicSolids.includes(solid))
+        const meshId = meshIdForMesh(object.name)
+        if (!meshId) return
+        const binding = bindings.get(meshId)
+        const color = binding
+          ? latestColorway.current[binding.part.id] ?? definition.defaultColors[binding.part.id]
+          : definition.fixedColors[meshId] ?? definition.fallbackFixedColor
+        object.userData.configuratorPartId = binding?.part.id
+        object.material = createCadMaterial(color, definition.metallicSolids.includes(meshId))
       })
       const originalMeshes: Array<{ mesh: THREE.Mesh; solid: string }> = []
       model.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return
-        const solid = solidForMesh(object.name)
-        if (solid && customizable.has(solid)) originalMeshes.push({ mesh: object, solid })
+        const partId = object.userData.configuratorPartId
+        if (typeof partId === 'string') originalMeshes.push({ mesh: object, solid: partId })
       })
       originalMeshes.forEach(({ mesh, solid }) => {
         const material = createSelectionOverlayMaterial()
         const overlay = new THREE.Mesh(mesh.geometry, material)
         overlay.name = `selection-overlay-${solid}`
+        overlay.userData.selectionOverlay = true
         overlay.renderOrder = 1000
         mesh.add(overlay)
         selectionOverlays.push({ solid, material })
@@ -387,7 +433,7 @@ function ThreePreview({ definition, colorway, canvasRef, theme, selectedSolidId,
       const glow = reduceMotion.current ? (elapsed < 700 ? 0.62 : 0) : doublePulse(elapsed)
       modelRef.current?.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return
-        const solid = solidForMesh(object.name)
+        const solid = object.userData.configuratorPartId
         const materials = Array.isArray(object.material) ? object.material : [object.material]
         materials.forEach((material) => {
           if (material instanceof THREE.ShaderMaterial && material.uniforms.selectionGlow) {
@@ -691,6 +737,7 @@ export default function App() {
       <span className="section-label">Configurator</span>
       <div className="topbar-actions">
         <label className="model-selector"><span>Model</span><select value={model.id} onChange={(event) => chooseModel(event.target.value)} aria-label="Headphone model">
+          {!PRODUCT_MODELS.some((item) => item.id === model.id) && <option value={model.id}>Private preview</option>}
           {PRODUCT_MODELS.map((item) => <option key={item.id} value={item.id}>{item.selectorLabel}</option>)}
         </select></label>
         <button className="theme-toggle" type="button" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} aria-pressed={theme === 'dark'} onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}>
@@ -705,8 +752,8 @@ export default function App() {
 
     <section className="configurator">
       <div className="product-area">
-        <ThreePreview definition={model} colorway={colorway} canvasRef={canvasRef} theme={theme} selectedSolidId={currentPart.solidId} selectionPulseKey={selectionPulseKey} />
-        <div className="preview-footer"><div><span>Current model</span><strong>{model.name} · {model.parts.length} customizable parts</strong><small className={model.isCapraHeadphone ? 'model-credit' : 'model-credit external-design'}>{model.ownershipNotice}</small></div><div className="preview-actions"><a href={model.printFilesUrl} target="_blank" rel="noopener noreferrer">Get print files <small>{model.printFilesSource}</small></a><button onClick={download}>Download PNG</button></div></div>
+        <ThreePreview definition={model} colorway={colorway} canvasRef={canvasRef} theme={theme} selectedPartId={currentPart.id} selectionPulseKey={selectionPulseKey} />
+        <div className="preview-footer"><div><span>Current model</span><strong>{model.name} · {model.parts.length} customizable parts</strong><small className={model.isCapraHeadphone ? 'model-credit' : 'model-credit external-design'}>{model.ownershipNotice}</small></div><div className="preview-actions">{model.printFilesUrl && <a href={model.printFilesUrl} target="_blank" rel="noopener noreferrer">Get print files <small>{model.printFilesSource}</small></a>}<button onClick={download}>Download PNG</button></div></div>
       </div>
 
       <aside className="controls">

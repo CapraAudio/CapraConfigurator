@@ -5,6 +5,9 @@ export type FilamentMaterialId = 'pla' | 'petg' | 'pctg' | 'abs' | 'asa' | 'tpu-
 export type ProductPart = {
   id: string
   solidId: string
+  stockSolidIds?: string[]
+  replacementSolidIds?: string[]
+  stockAccessorySolidIds?: string[]
   name: string
   displayCode?: string
   hideSolidId?: boolean
@@ -34,6 +37,7 @@ export type ProductModelDefinition = {
   parts: ProductPart[]
   defaultColors: Record<string, string>
   fixedColors: Record<string, string>
+  hiddenSolidIds?: string[]
   metallicSolids: string[]
   fallbackFixedColor: string
 }
@@ -206,8 +210,100 @@ export const OPEN_OMEGA: ProductModelDefinition = {
   fallbackFixedColor: '#343438',
 }
 
-export const PRODUCT_MODELS: ProductModelDefinition[] = [SATYR_4, OPEN_OMEGA]
-export const PRODUCT_MODEL_BY_ID = Object.fromEntries(PRODUCT_MODELS.map((model) => [model.id, model])) as Record<string, ProductModelDefinition>
+const MODEL_183X_RIGID: FilamentMaterialId[] = ['petg', 'pctg', 'abs', 'asa', 'pla']
+const model183xParts: ProductPart[] = [
+  { id: '183X-H02', solidId: 'S041', stockSolidIds: ['S041'], replacementSolidIds: ['R042'], name: 'Comfort Strap', hideSolidId: true, category: 'headband', allowedFilamentMaterials: TPU_95A },
+  { id: '183X-H03-R', solidId: 'S064', stockSolidIds: ['S064'], replacementSolidIds: ['R054'], name: 'Right Rear Clasp', hideSolidId: true, category: 'headband', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-H03-L', solidId: 'S052', stockSolidIds: ['S052'], replacementSolidIds: ['R055'], name: 'Left Rear Clasp', hideSolidId: true, category: 'headband', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-H04-R', solidId: 'S059', stockSolidIds: ['S059'], replacementSolidIds: ['R048'], stockAccessorySolidIds: ['S048', 'S049', 'S050', 'S051'], name: 'Right Front Cover', hideSolidId: true, category: 'headband', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-H04-L', solidId: 'S054', stockSolidIds: ['S054'], replacementSolidIds: ['R049'], stockAccessorySolidIds: ['S042', 'S043', 'S044', 'S045', 'S046', 'S047'], name: 'Left Front Cover', hideSolidId: true, category: 'headband', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-A02', solidId: 'S011', stockSolidIds: ['S011'], replacementSolidIds: ['R011'], name: 'Right Driver Retention', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-A06', solidId: 'S019', stockSolidIds: ['S019'], replacementSolidIds: ['R019'], name: 'Right Yoke Shell', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-R-FWD', solidId: 'S020', stockSolidIds: ['S020'], replacementSolidIds: ['R020'], name: 'Right Forward Yoke Spacer', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-R-REAR', solidId: 'S021', stockSolidIds: ['S021'], replacementSolidIds: ['R021'], name: 'Right Rear Yoke Spacer', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-A07', solidId: 'S022', stockSolidIds: ['S022'], replacementSolidIds: ['R022'], name: 'Right Fascia Trim', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-A08', solidId: 'S023', stockSolidIds: ['S023'], replacementSolidIds: ['R023'], name: 'Right Outer Grille', hideSolidId: true, category: 'right-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-B02', solidId: 'S076', stockSolidIds: ['S076'], replacementSolidIds: ['R068'], name: 'Left Driver Retention', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-B06', solidId: 'S087', stockSolidIds: ['S087'], replacementSolidIds: ['R082'], name: 'Left Yoke Shell', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-L-FWD', solidId: 'S088', stockSolidIds: ['S088'], replacementSolidIds: ['R084'], name: 'Left Forward Yoke Spacer', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-L-REAR', solidId: 'S089', stockSolidIds: ['S089'], replacementSolidIds: ['R085'], name: 'Left Rear Yoke Spacer', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-B07', solidId: 'S090', stockSolidIds: ['S090'], replacementSolidIds: ['R086'], name: 'Left Fascia Trim', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+  { id: '183X-B08', solidId: 'S091', stockSolidIds: ['S091'], replacementSolidIds: ['R087'], name: 'Left Outer Grille', hideSolidId: true, category: 'left-cup', allowedFilamentMaterials: MODEL_183X_RIGID },
+]
+
+const model183xDefaults: Record<string, string> = {
+  '183X-H02': '#272727',
+  '183X-H03-L': '#000000',
+  '183X-H03-R': '#000000',
+  '183X-H04-L': '#000000',
+  '183X-H04-R': '#000000',
+  '183X-A02': '#000000',
+  '183X-A06': '#000000',
+  '183X-R-FWD': '#000000',
+  '183X-R-REAR': '#E53935',
+  '183X-A07': '#646464',
+  '183X-A08': '#000000',
+  '183X-B02': '#000000',
+  '183X-B06': '#000000',
+  '183X-L-FWD': '#000000',
+  '183X-L-REAR': '#1E88E5',
+  '183X-B07': '#646464',
+  '183X-B08': '#000000',
+}
+
+const model183xFixedColors: Record<string, string> = {}
+function setModel183xColors(color: string, solids: number[]) {
+  solids.forEach((solid) => { model183xFixedColors[`S${String(solid).padStart(3, '0')}`] = color })
+}
+setModel183xColors('#9A9EA3', [0, 1, 2, 3, 65, 66, 67, 68])
+setModel183xColors('#74787D', [9, 10, 13, 14, 15, 16, 17, 18, ...Array.from({ length: 15 }, (_, index) => index + 24), 57, 63, 74, 75, 78, 81, 82, 83, 84, 85, 86])
+setModel183xColors('#000000', [4, 11, 12, 19, 23, 39, 52, 54, 59, 64, 69, 76, 77, 87, 91, 92])
+setModel183xColors('#F6F6F3', [5, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 55, 56, 60, 61, 62, 70, 79, 80])
+setModel183xColors('#85898E', [40, 53, 58])
+setModel183xColors('#1E1E1E', [6, 71])
+setModel183xColors('#646464', [22, 90])
+setModel183xColors('#F3CB7C', [7, 72])
+setModel183xColors('#F5F5F6', [8, 73])
+setModel183xColors('#272727', [41])
+
+export const MODEL_183X: ProductModelDefinition = {
+  id: '183x',
+  name: '183X',
+  selectorLabel: '183X',
+  designer: 'Capra Audio',
+  ownershipNotice: 'A Capra Audio headphone',
+  isCapraHeadphone: true,
+  printFilesUrl: '',
+  printFilesSource: '',
+  assetUrl: publicAsset('183x-stock-replacement.glb'),
+  previewUrl: publicAsset('183x-preview.png'),
+  maskUrl: (partId) => publicAsset(`mask-183x-${partId.toLowerCase()}.png`),
+  initialRotation: [0.14, 2.35, 0],
+  parts: model183xParts,
+  defaultColors: model183xDefaults,
+  fixedColors: model183xFixedColors,
+  // Stock badge lettering stays hidden until the product is publicly released.
+  hiddenSolidIds: ['S042', 'S043', 'S044', 'S045', 'S046', 'S047', 'S048', 'S049', 'S050', 'S051'],
+  metallicSolids: [
+    'S000', 'S001', 'S002', 'S003', 'S007', 'S008', 'S009', 'S010',
+    'S014', 'S015', 'S016', 'S017', 'S018', 'S022', 'S023',
+    ...Array.from({ length: 15 }, (_, index) => `S${String(index + 24).padStart(3, '0')}`),
+    'S040', 'S053', 'S057', 'S058', 'S063', 'S065', 'S066', 'S067', 'S068',
+    'S074', 'S075', 'S081', 'S082', 'S083', 'S084', 'S085', 'S086', 'S090', 'S091',
+  ],
+  fallbackFixedColor: '#74787D',
+}
+
+// Keep unreleased models routable for private local review, but exclude them
+// from PRODUCT_MODELS so they never appear in the public model selector.
+const SHOW_183X_IN_MODEL_SELECTOR = false
+export const PRODUCT_MODELS: ProductModelDefinition[] = [
+  SATYR_4,
+  OPEN_OMEGA,
+  ...(SHOW_183X_IN_MODEL_SELECTOR ? [MODEL_183X] : []),
+]
+const ROUTABLE_PRODUCT_MODELS = [...PRODUCT_MODELS, MODEL_183X]
+export const PRODUCT_MODEL_BY_ID = Object.fromEntries(ROUTABLE_PRODUCT_MODELS.map((model) => [model.id, model])) as Record<string, ProductModelDefinition>
 export const DEFAULT_PRODUCT_MODEL = SATYR_4
 
 export const LEGACY_COLORS: Record<string, string> = {

@@ -17,9 +17,19 @@ parser.add_argument('output')
 parser.add_argument('--name', default='satyr-4')
 parser.add_argument('--mask-prefix', default='')
 parser.add_argument('--solids', help='Comma-separated customizable solid IDs')
+parser.add_argument('--groups', help='Semicolon-separated mask groups in GROUP:S001,S002 format')
+parser.add_argument('--hidden-solids', default='', help='Comma-separated solid IDs omitted from the preview')
 args = parser.parse_args()
+hidden_solids = set(filter(None, args.hidden_solids.split(',')))
 
-customizable_solids = args.solids.split(',') if args.solids else SATYR_CUSTOMIZABLE_SOLIDS
+if args.groups:
+    mask_groups = {}
+    for group in args.groups.split(';'):
+        group_id, solids = group.split(':', 1)
+        mask_groups[group_id] = solids.split(',')
+else:
+    customizable_solids = args.solids.split(',') if args.solids else SATYR_CUSTOMIZABLE_SOLIDS
+    mask_groups = {solid: [solid] for solid in customizable_solids}
 source = Path(args.source)
 output = Path(args.output)
 output.mkdir(parents=True, exist_ok=True)
@@ -30,12 +40,21 @@ angle_y, angle_x = np.radians(-22), np.radians(8)
 ry = np.array([[np.cos(angle_y), 0, np.sin(angle_y)], [0, 1, 0], [-np.sin(angle_y), 0, np.cos(angle_y)]])
 rx = np.array([[1, 0, 0], [0, np.cos(angle_x), -np.sin(angle_x)], [0, np.sin(angle_x), np.cos(angle_x)]])
 rotation = rx @ ry
-solid_codes = {solid: index + 1 for index, solid in enumerate(customizable_solids)}
+group_codes = {group_id: index + 1 for index, group_id in enumerate(mask_groups)}
+solid_codes = {
+    solid: group_codes[group_id]
+    for group_id, solids in mask_groups.items()
+    for solid in solids
+}
 
 records = []
 projected_points = []
 for name, mesh in scene.geometry.items():
+    if name.lower().startswith('replacement_'):
+        continue
     solid = 'S' + name.split('_')[-1]
+    if solid in hidden_solids:
+        continue
     code = solid_codes.get(solid, 0)
     vertices = (np.asarray(mesh.vertices, dtype=np.float64) - center) @ rotation.T
     projected_points.append(vertices[:, :2])
@@ -68,8 +87,8 @@ for _, poly, code, brightness in sorted(records, key=lambda item: item[0]):
 
 base.save(output / f'{args.name}-preview.png', optimize=True)
 segment_array = np.asarray(segments)
-for solid, code in solid_codes.items():
+for group_id, code in group_codes.items():
     mask = Image.fromarray(np.where(segment_array == code, 255, 0).astype(np.uint8), mode='L')
-    mask.save(output / f'mask-{args.mask_prefix}{solid.lower()}.png', optimize=True)
+    mask.save(output / f'mask-{args.mask_prefix}{group_id.lower()}.png', optimize=True)
 
-print(f'Rendered {len(records):,} visible triangles and {len(customizable_solids)} color masks')
+print(f'Rendered {len(records):,} visible triangles and {len(mask_groups)} color masks')

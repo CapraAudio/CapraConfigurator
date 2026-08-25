@@ -187,6 +187,8 @@ export function buildFilamentCombinations(
   for (const part of model.parts) {
     const color = normalizedHex(colorway[part.id] ?? model.defaultColors[part.id])
     if (!color) continue
+    const defaultColor = normalizedHex(model.defaultColors[part.id])
+    if (part.replacementSolidIds?.length && color === defaultColor) continue
     for (const material of part.allowedFilamentMaterials) {
       const key = `${color}:${material}`
       const existing = combinations.get(key)
